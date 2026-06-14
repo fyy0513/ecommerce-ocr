@@ -1,6 +1,10 @@
 .vercel
 .netlify
 node_modules
+.wrangler
+dist
+build
+.output
 downloads
 outputs
 work
