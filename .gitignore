@@ -1,0 +1,7 @@
+.vercel
+.netlify
+node_modules
+downloads
+outputs
+work
+*.log

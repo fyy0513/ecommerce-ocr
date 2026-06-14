@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>电商截图识别工具</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: #172033;
+      background: #f5f7fb;
+    }
+    header {
+      padding: 22px 28px;
+      background: #ffffff;
+      border-bottom: 1px solid #e5e9f2;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    header p { margin: 0; color: #667085; font-size: 14px; }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 22px;
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) 1fr;
+      gap: 18px;
+    }
+    section {
+      background: #ffffff;
+      border: 1px solid #e5e9f2;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 16px;
+    }
+    .drop-zone {
+      min-height: 260px;
+      border: 2px dashed #cbd5e1;
+      border-radius: 10px;
+      background: #f8fafc;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 18px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .drop-zone.dragover {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+    .drop-zone strong { display: block; margin-bottom: 8px; }
+    .drop-zone span { color: #667085; font-size: 13px; line-height: 1.7; }
+    input[type="file"] { display: none; }
+    .preview-wrap {
+      margin-top: 14px;
+      border: 1px solid #e5e9f2;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0f172a;
+      min-height: 120px;
+      display: grid;
+      place-items: center;
+    }
+    #preview {
+      max-width: 100%;
+      max-height: 520px;
+      display: none;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #e8eef7;
+      color: #172033;
+    }
+    button.primary {
+      background: #2563eb;
+      color: white;
+    }
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+    .status {
+      min-height: 22px;
+      margin-top: 12px;
+      color: #475467;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .status.error { color: #b42318; }
+    .status.ok { color: #047857; }
+    form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      color: #475467;
+      font-weight: 700;
+    }
+    label.full { grid-column: 1 / -1; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid #d0d5dd;
+      border-radius: 8px;
+      padding: 10px 11px;
+      font: inherit;
+      color: #172033;
+      background: white;
+    }
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+    .empty-field {
+      background: #fff7cc;
+      border-color: #facc15;
+    }
+    .raw-box {
+      margin-top: 16px;
+    }
+    .hint {
+      margin-top: 10px;
+      color: #667085;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    @media (max-width: 880px) {
+      main { grid-template-columns: 1fr; padding: 14px; }
+      form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>电商商品截图识别工具</h1>
+    <p>支持 Ctrl+V 粘贴、拖拽、点击上传截图，自动提取商品运营字段。</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>截图上传</h2>
+      <div class="drop-zone" id="dropZone">
+        <div>
+          <strong>粘贴 / 拖拽 / 点击上传截图</strong>
+          <span>支持淘宝、京东、抖音等商品详情页截图。<br>快捷键：复制截图后按 Ctrl+V。</span>
+        </div>
+      </div>
+      <input id="fileInput" type="file" accept="image/*">
+
+      <div class="preview-wrap">
+        <img id="preview" alt="截图预览">
+        <span id="previewEmpty" style="color:#94a3b8;font-size:13px;">暂无截图</span>
+      </div>
+
+      <div class="toolbar">
+        <button class="primary" id="recognizeBtn" disabled>开始识别</button>
+        <button id="clearBtn">清空</button>
+      </div>
+      <div class="status" id="status">请先上传或粘贴一张截图。</div>
+      <div class="hint">部署前需要在 Vercel 项目环境变量中设置 <code>QWEN_API_KEY</code>，否则后端会返回缺少 Key。</div>
+    </section>
+
+    <section>
+      <h2>识别结果</h2>
+      <form id="resultForm">
+        <label class="full">标题
+          <input id="title" name="标题" placeholder="自动识别商品标题">
+        </label>
+        <label>价格
+          <input id="price" name="价格" placeholder="例如 ¥39.9">
+        </label>
+        <label>原价
+          <input id="originalPrice" name="原价" placeholder="例如 ¥59.9">
+        </label>
+        <label>销量
+          <input id="sales" name="销量" placeholder="例如 2.3万+">
+        </label>
+        <label>评价数
+          <input id="reviews" name="评价数" placeholder="例如 1000+">
+        </label>
+        <label>店铺
+          <input id="shop" name="店铺" placeholder="自动识别店铺名">
+        </label>
+        <label>平台
+          <input id="platform" name="平台" placeholder="淘宝 / 京东 / 抖音">
+        </label>
+        <label class="full">活动
+          <input id="activity" name="活动" placeholder="例如 满减、包邮、券后价">
+        </label>
+      </form>
+
+      <div class="raw-box">
+        <h2>原始识别文本</h2>
+        <textarea id="rawText" placeholder="模型返回的原始识别文本会显示在这里，方便人工校验。"></textarea>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const previewEmpty = document.getElementById('previewEmpty');
+    const recognizeBtn = document.getElementById('recognizeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusEl = document.getElementById('status');
+
+    const fields = {
+      title: document.getElementById('title'),
+      price: document.getElementById('price'),
+      originalPrice: document.getElementById('originalPrice'),
+      sales: document.getElementById('sales'),
+      reviews: document.getElementById('reviews'),
+      shop: document.getElementById('shop'),
+      platform: document.getElementById('platform'),
+      activity: document.getElementById('activity'),
+      rawText: document.getElementById('rawText')
+    };
+
+    let currentFile = null;
+    let currentDataUrl = '';
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', event => {
+      const file = event.target.files && event.target.files[0];
+      if (file) loadFile(file);
+    });
+
+    dropZone.addEventListener('dragover', event => {
+      event.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', event => {
+      event.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = [...event.dataTransfer.files].find(item => item.type.startsWith('image/'));
+      if (file) loadFile(file);
+      else setStatus('没有找到图片文件。', 'error');
+    });
+
+    document.addEventListener('paste', event => {
+      const item = [...event.clipboardData.items].find(entry => entry.type.startsWith('image/'));
+      if (!item) return;
+      const file = item.getAsFile();
+      if (file) loadFile(file);
+    });
+
+    recognizeBtn.addEventListener('click', recognizeImage);
+    clearBtn.addEventListener('click', clearAll);
+
+    Object.values(fields).forEach(element => {
+      element.addEventListener('input', updateEmptyHighlights);
+    });
+    updateEmptyHighlights();
+
+    async function loadFile(file) {
+      if (!file.type.startsWith('image/')) {
+        setStatus('请选择图片文件。', 'error');
+        return;
+      }
+      currentFile = file;
+      currentDataUrl = await imageToDataUrl(file);
+      preview.src = currentDataUrl;
+      preview.style.display = 'block';
+      previewEmpty.style.display = 'none';
+      recognizeBtn.disabled = false;
+      setStatus(`已加载截图：${file.name || '剪贴板图片'}，可以开始识别。`, 'ok');
+    }
+
+    async function imageToDataUrl(file) {
+      const sourceUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.src = sourceUrl;
+      await image.decode();
+
+      const maxSide = 1800;
+      const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.round(image.width * ratio);
+      const height = Math.round(image.height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0, width, height);
+      URL.revokeObjectURL(sourceUrl);
+      return canvas.toDataURL('image/jpeg', 0.9);
+    }
+
+    async function recognizeImage() {
+      if (!currentDataUrl) {
+        setStatus('请先上传截图。', 'error');
+        return;
+      }
+
+      recognizeBtn.disabled = true;
+      setStatus('正在调用 DashScope 识别，请稍候...', '');
+
+      try {
+        const response = await fetch('/api/recognize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageDataUrl: currentDataUrl })
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || `请求失败：${response.status}`);
+        }
+        fillResult(payload.result || {});
+        fields.rawText.value = payload.result?.['原始识别文本'] || payload.raw || '';
+        updateEmptyHighlights();
+        setStatus('识别完成。请检查黄色字段并手动补齐。', 'ok');
+      } catch (error) {
+        setStatus(error.message || '识别失败。', 'error');
+      } finally {
+        recognizeBtn.disabled = false;
+      }
+    }
+
+    function fillResult(result) {
+      fields.title.value = result['标题'] || '';
+      fields.price.value = result['价格'] || '';
+      fields.originalPrice.value = result['原价'] || '';
+      fields.sales.value = result['销量'] || '';
+      fields.reviews.value = result['评价数'] || '';
+      fields.shop.value = result['店铺'] || '';
+      fields.platform.value = result['平台'] || '';
+      fields.activity.value = Array.isArray(result['活动标签'])
+        ? result['活动标签'].join('、')
+        : (result['活动标签'] || '');
+    }
+
+    function updateEmptyHighlights() {
+      Object.entries(fields).forEach(([key, element]) => {
+        if (key === 'rawText') return;
+        element.classList.toggle('empty-field', !element.value.trim());
+      });
+    }
+
+    function clearAll() {
+      currentFile = null;
+      currentDataUrl = '';
+      fileInput.value = '';
+      preview.src = '';
+      preview.style.display = 'none';
+      previewEmpty.style.display = 'block';
+      recognizeBtn.disabled = true;
+      Object.values(fields).forEach(element => element.value = '');
+      updateEmptyHighlights();
+      setStatus('已清空，请重新上传或粘贴截图。', '');
+    }
+
+    function setStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type || ''}`;
+    }
+  </script>
+</body>
+</html>
